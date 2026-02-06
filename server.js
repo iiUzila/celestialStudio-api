@@ -14,14 +14,28 @@ let activeCodes = {};
 let verifiedStatus = {};
 let maintenanceMode = false;
 
-app.use(cors());
+const allowedOrigins = [
+    'https://celestial-studios.vercel.app',
+    'http://127.0.0.1:5500',
+    'http://localhost:5500'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            return callback(new Error('CORS blocked'), false);
+        }
+        return callback(null, true);
+    },
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
+
 app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
-    res.json({ 
-        status: "Celestial API Online", 
-        maintenance: maintenanceMode 
-    });
+    res.json({ status: "Celestial API Online", maintenance: maintenanceMode });
 });
 
 app.get('/maintenance-status', (req, res) => {
@@ -30,24 +44,19 @@ app.get('/maintenance-status', (req, res) => {
 
 app.post('/set-maintenance', (req, res) => {
     const { enabled, admin, masterUser, masterPass } = req.body;
-
     const isRobloxAdmin = admin && ADMINS.some(a => a.toLowerCase() === admin.toLowerCase());
     const isMasterLogin = (masterUser === MASTER_USER && masterPass === MASTER_PASS);
 
     if (isRobloxAdmin || isMasterLogin) {
         maintenanceMode = (enabled === true);
-        console.log(`[SYSTEM] Maintenance set to ${maintenanceMode} by ${admin || masterUser}`);
         return res.json({ success: true, enabled: maintenanceMode });
     }
-
-    console.log(`[DENIED] Unauthorized attempt to change maintenance by: ${admin || masterUser}`);
     res.status(403).json({ error: "Unauthorized access" });
 });
 
 app.post('/start-verification', (req, res) => {
     const { userId, code } = req.body;
     if (!userId || !code) return res.status(400).json({ error: "Missing data" });
-    
     activeCodes[userId] = code; 
     verifiedStatus[userId] = false; 
     res.json({ success: true });
@@ -55,16 +64,13 @@ app.post('/start-verification', (req, res) => {
 
 app.post('/verify-game', (req, res) => {
     const { userId, codeInput } = req.body; 
-    if (!userId || !codeInput) return res.status(400).json({ error: "Missing data" });
-
     const expectedCode = activeCodes[userId];
-
     if (expectedCode && expectedCode === codeInput) {
         verifiedStatus[userId] = true; 
         delete activeCodes[userId];
         res.json({ success: true });
     } else {
-        res.json({ success: false, message: "Invalid code" });
+        res.json({ success: false });
     }
 });
 
@@ -84,24 +90,20 @@ app.get('/proxy-search', async (req, res) => {
         const response = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${keyword}&limit=1`);
         res.json(response.data);
     } catch (error) {
-        res.status(500).json({ error: "Roblox Search Failed" });
+        res.status(500).json({ error: "Search failed" });
     }
 });
 
 app.get('/get-avatar', async (req, res) => {
     const { userId } = req.query;
     try {
-        const response = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
-        if (response.data.data && response.data.data.length > 0) {
-            res.json({ imageUrl: response.data.data[0].imageUrl });
-        } else {
-            res.status(404).json({ error: "Avatar not found" });
-        }
+        const response = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png`);
+        res.json(response.data);
     } catch (error) {
-        res.status(500).json({ error: "Avatar API Failed" });
+        res.status(500).json({ error: "Avatar failed" });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`Celestial Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
