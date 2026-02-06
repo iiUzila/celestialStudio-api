@@ -81,7 +81,7 @@ app.get('/check-status', (req, res) => {
 app.get('/proxy-search', async (req, res) => {
     const { keyword } = req.query;
     try {
-        const response = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${keyword}&limit=10`);
+        const response = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${keyword}&limit=1`);
         res.json(response.data);
     } catch (error) {
         res.status(500).json({ error: "Roblox Search Failed" });
