@@ -26,19 +26,21 @@ app.get('/maintenance-status', (req, res) => {
 app.post('/set-maintenance', (req, res) => {
     const { enabled, admin } = req.body;
     
+    // Log para debug no Render
+    console.log(`[REQUEST] Toggle Maintenance: ${enabled} by ${admin}`);
+
     if (!admin || !ADMINS.some(a => a.toLowerCase() === admin.toLowerCase())) {
+        console.log(`[DENIED] User ${admin} is not in admin list.`);
         return res.status(403).json({ error: "Unauthorized" });
     }
 
-    maintenanceMode = enabled;
-    console.log(`[SYSTEM] Maintenance set to ${enabled} by ${admin}`);
+    maintenanceMode = (enabled === true); 
+    console.log(`[SUCCESS] Maintenance is now: ${maintenanceMode}`);
     res.json({ success: true, enabled: maintenanceMode });
 });
 
 app.post('/start-verification', (req, res) => {
     const { userId, code } = req.body;
-    if (!userId || !code) return res.status(400).json({ error: "Missing parameters" });
-    
     activeCodes[userId] = code; 
     verifiedStatus[userId] = false; 
     res.json({ success: true });
@@ -46,16 +48,13 @@ app.post('/start-verification', (req, res) => {
 
 app.post('/verify-game', (req, res) => {
     const { userId, codeInput } = req.body; 
-    if (!userId || !codeInput) return res.status(400).json({ error: "Missing parameters" });
-
     const expectedCode = activeCodes[userId];
-
     if (expectedCode && expectedCode === codeInput) {
         verifiedStatus[userId] = true; 
         delete activeCodes[userId];
         res.json({ success: true });
     } else {
-        res.json({ success: false, message: "Invalid code" });
+        res.json({ success: false });
     }
 });
 
@@ -74,23 +73,7 @@ app.get('/proxy-search', async (req, res) => {
     try {
         const response = await axios.get(`https://users.roblox.com/v1/users/search?keyword=${keyword}&limit=10`);
         res.json(response.data);
-    } catch (error) {
-        res.status(500).json({ error: "Roblox Search Failed" });
-    }
-});
-
-app.get('/get-avatar', async (req, res) => {
-    const { userId } = req.query;
-    try {
-        const response = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
-        if (response.data.data && response.data.data.length > 0) {
-            res.json({ imageUrl: response.data.data[0].imageUrl });
-        } else {
-            res.status(404).json({ error: "Avatar not found" });
-        }
-    } catch (error) {
-        res.status(500).json({ error: "Avatar API Failed" });
-    }
+    } catch (e) { res.status(500).send(); }
 });
 
 app.listen(PORT, () => {
